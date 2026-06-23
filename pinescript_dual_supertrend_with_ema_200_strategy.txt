@@ -1,0 +1,282 @@
+//@version=5
+strategy("Dual Supertrend with EMA 200", overlay = true,process_orders_on_close = true)
+
+nt= input.int(title='target per session', defval=1)
+
+// First Super Trend
+atrPeriod1 = input.int(10, "ATR Length First Super Trend", minval = 1)
+factor1 = input.float(3.0, "Factor First Super Trend", minval = 0.01, step = 0.01)
+[supertrend1, direction1] = ta.supertrend(factor1, atrPeriod1)
+supertrend1 := barstate.isfirst ? na : supertrend1
+upTrend1 = plot(direction1 < 0 ? supertrend1 : na, "Up Trend First Super Trend", color = color.green, style = plot.style_linebr)
+downTrend1 = plot(direction1 < 0 ? na : supertrend1, "Down Trend First Super Trend", color = color.red, style = plot.style_linebr)
+
+// Second Super Trend (22,5)
+atrPeriod2 = input.int(22, "ATR Length Second Super Trend", minval = 1)
+factor2 = input.float(5.0, "Factor Second Super Trend", minval = 0.01, step = 0.01)
+[supertrend2, direction2] = ta.supertrend(factor2, atrPeriod2)
+supertrend2 := barstate.isfirst ? na : supertrend2
+upTrend2 = plot(direction2 < 0 ? supertrend2 : na, "Up Trend Second Super Trend", color = color.blue, style = plot.style_linebr)
+downTrend2 = plot(direction2 < 0 ? na : supertrend2, "Down Trend Second Super Trend", color = color.purple, style = plot.style_linebr)
+
+// EMA 200
+ema200 = ta.ema(close, 200)
+plot(ema200, "EMA 200", color=color.blue,linewidth = 2)
+
+// Filling
+bodyMiddle = plot(barstate.isfirst ? na : (open + close) / 2, "Body Middle", display = display.none)
+fill(bodyMiddle, upTrend1, color.new(color.green, 90), fillgaps = false)
+fill(bodyMiddle, downTrend1, color.new(color.red, 90), fillgaps = false)
+fill(bodyMiddle, upTrend2, color.new(color.blue, 90), fillgaps = false)
+fill(bodyMiddle, downTrend2, color.new(color.purple, 90), fillgaps = false)
+
+higherTF = input.timeframe('D', group='Pivot Settings')
+OPENprev = request.security(syminfo.tickerid, higherTF, open[1], lookahead=barmerge.lookahead_on)
+HIGHprev = request.security(syminfo.tickerid, higherTF, high[1], lookahead=barmerge.lookahead_on)
+LOWprev = request.security(syminfo.tickerid, higherTF, low[1], lookahead=barmerge.lookahead_on)
+CLOSEprev = request.security(syminfo.tickerid, higherTF, close[1], lookahead=barmerge.lookahead_on)
+OPENcurr = request.security(syminfo.tickerid, higherTF, open, lookahead=barmerge.lookahead_on)
+// initiating variables
+float PP = na
+float R1 = na
+float R2 = na
+float R3 = na
+float R4 = na
+float R5 = na
+float S1 = na
+float S2 = na
+float S3 = na
+float S4 = na
+float S5 = na
+float X = na
+
+type = input.string('Traditional', 'Pivot Type', options=['Traditional', 'Fibonacci', 'Woodie', 'Classic', 'Demark', 'Camarilla'], group='Pivot Settings')
+if type == 'Traditional'
+    PP := (HIGHprev + LOWprev + CLOSEprev) / 3
+    R1 := PP * 2 - LOWprev
+    S1 := PP * 2 - HIGHprev
+    R2 := PP + HIGHprev - LOWprev
+    S2 := PP - (HIGHprev - LOWprev)
+    R3 := PP * 2 + HIGHprev - 2 * LOWprev
+    S3 := PP * 2 - (2 * HIGHprev - LOWprev)
+    R4 := PP * 3 + HIGHprev - 3 * LOWprev
+    S4 := PP * 3 - (3 * HIGHprev - LOWprev)
+    R5 := PP * 4 + HIGHprev - 4 * LOWprev
+    S5 := PP * 4 - (4 * HIGHprev - LOWprev)
+    S5
+else if type == 'Fibonacci'
+    PP := (HIGHprev + LOWprev + CLOSEprev) / 3
+    R1 := PP + 0.382 * (HIGHprev - LOWprev)
+    S1 := PP - 0.382 * (HIGHprev - LOWprev)
+    R2 := PP + 0.618 * (HIGHprev - LOWprev)
+    S2 := PP - 0.618 * (HIGHprev - LOWprev)
+    R3 := PP + HIGHprev - LOWprev
+    S3 := PP - (HIGHprev - LOWprev)
+    S3
+else if type == 'Woodie'
+    PP := (HIGHprev + LOWprev + 2 * OPENcurr) / 4
+    R1 := 2 * PP - LOWprev
+    S1 := 2 * PP - HIGHprev
+    R2 := PP + HIGHprev - LOWprev
+    S2 := PP - (HIGHprev - LOWprev)
+    R3 := HIGHprev + 2 * (PP - LOWprev)
+    S3 := LOWprev - 2 * (HIGHprev - PP)
+    R4 := R3 + HIGHprev - LOWprev
+    S4 := S3 - (HIGHprev - LOWprev)
+    S4
+else if type == 'Classic'
+    PP := (HIGHprev + LOWprev + CLOSEprev) / 3
+    R1 := 2 * PP - LOWprev
+    S1 := 2 * PP - HIGHprev
+    R2 := PP + HIGHprev - LOWprev
+    S2 := PP - (HIGHprev - LOWprev)
+    R3 := PP + 2 * (HIGHprev - LOWprev)
+    S3 := PP - 2 * (HIGHprev - LOWprev)
+    R4 := PP + 3 * (HIGHprev - LOWprev)
+    S4 := PP - 3 * (HIGHprev - LOWprev)
+    S4
+else if type == 'Demark'
+    if OPENprev == CLOSEprev
+        X := HIGHprev + LOWprev + 2 * CLOSEprev
+        X
+    else if CLOSEprev > OPENprev
+        X := 2 * HIGHprev + LOWprev + CLOSEprev
+        X
+    else
+        X := 2 * LOWprev + HIGHprev + CLOSEprev
+        X
+    PP := X / 4
+    R1 := X / 2 - LOWprev
+    S1 := X / 2 - HIGHprev
+    S1
+else if type == 'Camarilla'
+    PP := (HIGHprev + LOWprev + CLOSEprev) / 3
+    R1 := CLOSEprev + 1.1 * (HIGHprev - LOWprev) / 12
+    S1 := CLOSEprev - 1.1 * (HIGHprev - LOWprev) / 12
+    R2 := CLOSEprev + 1.1 * (HIGHprev - LOWprev) / 6
+    S2 := CLOSEprev - 1.1 * (HIGHprev - LOWprev) / 6
+    R3 := CLOSEprev + 1.1 * (HIGHprev - LOWprev) / 4
+    S3 := CLOSEprev - 1.1 * (HIGHprev - LOWprev) / 4
+    R4 := CLOSEprev + 1.1 * (HIGHprev - LOWprev) / 2
+    S4 := CLOSEprev - 1.1 * (HIGHprev - LOWprev) / 2
+    S4
+
+plot(PP == PP[1] ? PP : na, 'Central Pivot', color=color.new(color.red, 0), style=plot.style_linebr, linewidth=1)
+plot(R1 == R1[1] ? R1 : na, 'R1', color=color.new(color.red, 0), style=plot.style_linebr)
+plot(R2 == R2[1] ? R2 : na, 'R2', color=color.new(color.red, 0), style=plot.style_linebr)
+plot(R3 == R3[1] ? R3 : na, 'R3', color=color.new(color.red, 0), style=plot.style_linebr)
+plot(R4 == R4[1] ? R4 : na, 'R4', color=color.new(color.red, 0), style=plot.style_linebr)
+plot(R5 == R5[1] ? R5 : na, 'R5', color=color.new(color.red, 0), style=plot.style_linebr)
+plot(S1 == S1[1] ? S1 : na, 'S1', color=color.new(color.green, 0), style=plot.style_linebr)
+plot(S2 == S2[1] ? S2 : na, 'S2', color=color.new(color.green, 0), style=plot.style_linebr)
+plot(S3 == S3[1] ? S3 : na, 'S3', color=color.new(color.green, 0), style=plot.style_linebr)
+plot(S4 == S4[1] ? S4 : na, 'S4', color=color.new(color.green, 0), style=plot.style_linebr)
+plot(S5 == S5[1] ? S5 : na, 'S5', color=color.new(color.green, 0), style=plot.style_linebr)
+
+buy = (ta.crossover(close,S1) or ta.crossover(close,S2) or ta.crossover(close,S3) or ta.crossover(close,S4) or ta.crossover(close,S5) or ta.crossover(close,R1) or ta.crossover(close,R2) or ta.crossover(close,R3) or ta.crossover(close,R4) or ta.crossover(close,R5) or ta.crossover(close,PP)) and direction1 < 0 and direction2 < 0 and close > ema200
+sell = (ta.crossunder(close,S1) or ta.crossunder(close,S2) or ta.crossunder(close,S3) or ta.crossunder(close,S4) or ta.crossunder(close,S5) or ta.crossunder(close,R1) or ta.crossunder(close,R2) or ta.crossunder(close,R3) or ta.crossunder(close,R4) or ta.crossunder(close,R5) or ta.crossunder(close,PP))  and direction1 > 0 and direction2 > 0 and close < ema200
+
+
+
+// plotshape(buy0,color=color.new(color.green, 0), style=shape.labelup, text='Buy Alert', textcolor=color.new(color.white, 0), location=location.belowbar, size=size.small)
+// plotshape(sell0 , color=color.new(color.red, 0), style=shape.labeldown, text='Sell Alert', textcolor=color.new(color.white, 0), location=location.abovebar, size=size.small)
+
+
+ 
+
+
+use_sl = input(true, title='Use Candle High/Low as SL')
+sl_buffer = input(10.00)
+
+Stop = 3.0//input(3.0, title='StopLoss')
+
+ProfitPerc = input(defval=100.0, title='TARGET')
+
+
+long_short = 0
+long_last = buy and (nz(long_short[1]) == 0 or nz(long_short[1]) == -1)
+short_last = sell and (nz(long_short[1]) == 0 or nz(long_short[1]) == 1)
+long_short := long_last ? 1 : short_last ? -1 : long_short[1]
+
+long_entered = false
+long_entered := long_entered[1]
+
+short_entered = false
+short_entered := short_entered[1]
+
+
+// var count = 0
+// count :=  ta.change(time ('D')) ? 0 : (strategy.position_size > 0 and strategy.position_size[1] < 1) or (strategy.position_size < 0 and strategy.position_size[1] > 1) ? count + 1 : count
+
+// ltp_hit = ((strategy.position_size > 0 and strategy.position_size[1] < 1) or (strategy.position_size < 0 and strategy.position_size[1] > 1)) and count <= nt
+// plotshape(count <= nt)
+// if not (count[1] <= nt)
+//     buy := false
+//     sell := false
+
+// if ta.change(time ('D'))
+//     count := 0
+
+
+
+
+longPrice = ta.valuewhen(buy and not long_entered, close, 0)
+
+
+shortPrice = ta.valuewhen(sell and not short_entered, close, 0)
+
+
+
+longStop = use_sl ? longPrice : longPrice - Stop
+shortStop = use_sl ? shortPrice : shortPrice + Stop
+
+if use_sl
+    longStop := ta.valuewhen(buy and not long_entered, low, 0) - sl_buffer
+    shortStop := ta.valuewhen(sell and not short_entered, high, 0) + sl_buffer
+    shortStop
+
+longTake = longPrice + ProfitPerc
+shortTake = shortPrice - ProfitPerc
+
+plot(long_short == 1 ? longStop : na, style=plot.style_linebr, color=color.new(color.red, 0), linewidth=1, title='Long Fixed SL')
+plot(long_short == -1 ? shortStop : na, style=plot.style_linebr, color=color.new(color.red, 0), linewidth=1, title='Short Fixed SL')
+plot(long_short == 1 ? longTake : na, style=plot.style_linebr, color=color.new(color.navy, 0), linewidth=1, title='Long Fixed TP')
+plot(long_short == -1 ? shortTake : na, style=plot.style_linebr, color=color.new(color.navy, 0), linewidth=1, title='Short Fixed TP')
+
+
+longBar1 = ta.barssince(long_last)
+longBar2 = longBar1 >= 0 ? true : false
+shortBar1 = ta.barssince(short_last)
+shortBar2 = shortBar1 >= 0 ? true : false
+
+longSLhit = long_short == 1 and longBar2 and low < longStop
+
+//if(long_entered and  sellSignal)
+    //longSLhit := true
+
+plotshape(longSLhit and not(sell and not short_entered and long_entered), style=shape.labelup, location=location.belowbar, color=color.new(color.gray, 0), size=size.tiny, title='Stop Loss', text='Long SL', textcolor=color.new(color.white, 0))
+shortSLhit = long_short == -1 and shortBar2 and high > shortStop
+
+
+//if(short_entered and buySignal)
+    //shortSLhit := true
+
+plotshape(shortSLhit and not(buy and not long_entered and short_entered), style=shape.labeldown, location=location.abovebar, color=color.new(color.gray, 0), size=size.tiny, title='Stop Loss', text='Short SL', textcolor=color.new(color.white, 0))
+
+
+longTPhit = long_short == 1 and longBar2 and high > longTake
+plotshape(longTPhit, style=shape.labeldown, location=location.abovebar, color=color.new(color.navy, 0), size=size.tiny, title='Target', text='Long TP', textcolor=color.new(color.white, 0))
+shortTPhit = long_short == -1 and shortBar2 and low < shortTake
+plotshape(shortTPhit, style=shape.labelup, location=location.belowbar, color=color.new(color.navy, 0), size=size.tiny, title='Target', text='Short TP', textcolor=color.new(color.white, 0))
+
+long_short := (long_short == 1 or long_short == 0) and longBar2 and (longSLhit or longTPhit) ? 0 : (long_short == -1 or long_short == 0) and shortBar2 and (shortSLhit or shortTPhit) ? 0 : long_short
+
+
+plotshape(buy and not long_entered, color=color.new(color.green, 0), style=shape.labelup, text='Buy', textcolor=color.new(color.white, 0), location=location.belowbar)
+plotshape(sell and not short_entered, color=color.new(color.red, 0), style=shape.labeldown, text='Sell', textcolor=color.new(color.white, 0), location=location.abovebar)
+
+if(buy and not long_entered)
+    strategy.entry("buy",strategy.long)
+    strategy.exit("Stop","buy",limit = longTake,stop = longStop) 
+    
+if(sell and not short_entered)
+    strategy.entry("sell",strategy.short)
+    strategy.exit("Stop","sell",limit = shortTake,stop = shortStop) 
+
+// plotshape(buy and not(long_entered) and (short_entered), color = color.green , style = shape.labelup , text = "FA Buy" , textcolor = color.white , location = location.belowbar)
+// plotshape(sell and not(short_entered)  and (long_entered), color = color.red , style = shape.labeldown , text = "FA Sell" , textcolor = color.white , location = location.abovebar)
+
+
+// alertcondition(condition=buy and  not(long_entered)  and (short_entered), title="Fully Algo Buy")
+// alertcondition(condition=sell and  not(short_entered)  and (long_entered), title="Fully Algo sell")
+
+alertcondition(condition=buy and not long_entered, title='Buy')
+alertcondition(condition=sell and not short_entered, title='Sell')
+
+if long_last
+    long_entered := true
+    short_entered := false
+    short_entered
+if short_last
+    short_entered := true
+    long_entered := false
+    long_entered
+
+alertcondition(condition=(longSLhit or shortSLhit) and not(sell and not short_entered and long_entered), title='Long/Short SL')
+//alertcondition(condition= shortSLhit and not (buy and  not(long_entered)  and (short_entered)), title="Short SL")
+
+alertcondition(condition=longTPhit or shortTPhit, title='Long/short TP')
+//alertcondition(condition=shortTPhit, title="Short TP")
+
+if longSLhit or longTPhit
+    long_entered := false
+    long_entered
+
+if shortSLhit or shortTPhit
+    short_entered := false
+    short_entered
+
+
+
+
+
